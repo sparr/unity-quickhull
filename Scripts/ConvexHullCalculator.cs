@@ -91,11 +91,22 @@ namespace GK {
 		const int INSIDE = -1;
 
 		/// <summary>
-		///   Epsilon value. If the coordinates of the point space are
-		///   exceptionally close to each other, this value might need to be
-		///   adjusted.
+		///   Tolerance, relative to the size of the point cloud. Distances are
+		///   compared against EPSILON times the largest dimension of the
+		///   points' bounding box, and areas against EPSILON times its square,
+		///   so the result does not depend on the units of the input.
 		/// </summary>
 		const float EPSILON = 0.0001f;
+
+		/// <summary>
+		///   Largest dimension of the current point cloud's bounding box.
+		/// </summary>
+		float scale;
+
+		/// <summary>
+		///   Distance tolerance for the current point cloud, EPSILON * scale.
+		/// </summary>
+		float epsilon;
 
 		/// <summary>
 		///   Struct representing a single face.
@@ -280,6 +291,8 @@ namespace GK {
 
 			Initialize(points, splitVerts);
 
+			SetTolerance(points);
+
 			GenerateInitialHull(points);
 
 			while (openSetTail >= 0) {
@@ -332,6 +345,31 @@ namespace GK {
 					hullVerts.Clear();
 				}
 			}
+		}
+
+		/// <summary>
+		///   Scale the tolerance to the point cloud. An absolute tolerance is
+		///   too coarse for points in small units, where it treats real
+		///   features as flat, and too fine for points in large units, where
+		///   it is below the float rounding error of the coordinates.
+		/// </summary>
+		void SetTolerance(List<Vector3> points) {
+			var min = points[0];
+			var max = points[0];
+
+			for (int i = 1; i < points.Count; i++) {
+				min = Vector3.Min(min, points[i]);
+				max = Vector3.Max(max, points[i]);
+			}
+
+			var size = max - min;
+			scale = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
+
+			if (!(scale > 0.0f)) {
+				throw new System.ArgumentException("Can't generate hull, points are coplanar");
+			}
+
+			epsilon = EPSILON * scale;
 		}
 
 		/// <summary>
@@ -798,7 +836,7 @@ namespace GK {
 							points[face.Vertex0],
 							face);
 
-						if (dist > EPSILON) {
+						if (dist > epsilon) {
 							assigned = true;
 
 							fp.Face = fi;
@@ -966,7 +1004,7 @@ namespace GK {
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		bool AreCoincident(Vector3 a, Vector3 b) {
-			return (a - b).magnitude <= EPSILON;
+			return (a - b).magnitude <= epsilon;
 		}
 
 		/// <summary>
@@ -974,7 +1012,8 @@ namespace GK {
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		bool AreCollinear(Vector3 a, Vector3 b, Vector3 c) {
-			return Cross(c - a, c - b).magnitude <= EPSILON;
+			// The cross product's length is twice the triangle's area.
+			return Cross(c - a, c - b).magnitude <= epsilon * scale;
 		}
 
 		/// <summary>
@@ -988,11 +1027,11 @@ namespace GK {
 			var m1 = n1.magnitude;
 			var m2 = n2.magnitude;
 
-			return m1 <= EPSILON
-				|| m2 <= EPSILON
-				|| AreCollinear(Vector3.zero,
-					(1.0f / m1) * n1,
-					(1.0f / m2) * n2);
+			// m1 and m2 are areas. The last test compares unit normals, which
+			// is independent of scale.
+			return m1 <= epsilon * scale
+				|| m2 <= epsilon * scale
+				|| Cross((1.0f / m1) * n1, (1.0f / m2) * n2).magnitude <= EPSILON;
 		}
 
 		/// <summary>
@@ -1081,7 +1120,7 @@ namespace GK {
 					var t1 = verts[tris[j + 1]];
 					var t2 = verts[tris[j + 2]];
 
-					Assert(Dot(points[i] - t0, Vector3.Cross(t1 - t0, t2 - t0)) <= EPSILON);
+					Assert(Dot(points[i] - t0, Vector3.Cross(t1 - t0, t2 - t0)) <= epsilon * scale * scale);
 				}
 
 			}
