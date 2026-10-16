@@ -282,7 +282,18 @@ namespace GK {
 
 			GenerateInitialHull(points);
 
+			// Each GrowHull call makes the farthest point of the open set a
+			// vertex of the hull, and ReassignPoints then moves it out of the
+			// open set, so a correct run takes fewer iterations than there are
+			// points. More means the hull has stopped being convex and the
+			// loop would not terminate.
+			var iterations = 0;
+
 			while (openSetTail >= 0) {
+				if (++iterations > points.Count) {
+					throw new System.InvalidOperationException("Can't generate hull, it did not converge");
+				}
+
 				GrowHull(points);
 			}
 
