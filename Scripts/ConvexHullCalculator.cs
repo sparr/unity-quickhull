@@ -495,39 +495,67 @@ namespace GK {
 
 		/// <summary>
 		///   Find four points in the point cloud that are not coplanar for the
-		///   seed hull
+		///   seed hull: the first point, the point farthest from it, the point
+		///   farthest from the line through those two, and the point farthest
+		///   from the plane through those three. Each step is one pass over
+		///   the points, so input with no 3D hull is rejected in O(n), where
+		///   searching for the first four non-coplanar points took O(n^4) for
+		///   coplanar input. The spread-out seed also leaves fewer points to
+		///   process.
 		/// </summary>
 		void FindInitialHullIndices(List<Vector3> points, out int b0, out int b1, out int b2, out int b3) {
 			var count = points.Count;
 
-			for (int i0 = 0; i0 < count - 3; i0++) {
-				for (int i1 = i0 + 1; i1 < count - 2; i1++) {
-					var p0 = points[i0];
-					var p1 = points[i1];
+			b0 = 0;
+			var p0 = points[b0];
 
-					if (AreCoincident(p0, p1)) continue;
-
-					for (int i2 = i1 + 1; i2 < count - 1; i2++) {
-						var p2 = points[i2];
-
-						if (AreCollinear(p0, p1, p2)) continue;
-
-						for (int i3 = i2 + 1; i3 < count - 0; i3++) {
-							var p3 = points[i3];
-
-							if(AreCoplanar(p0, p1, p2, p3)) continue;
-
-							b0 = i0;
-							b1 = i1;
-							b2 = i2;
-							b3 = i3;
-							return;
-						}
-					}
+			b1 = b0;
+			var best = 0.0f;
+			for (int i = 0; i < count; i++) {
+				var d = (points[i] - p0).sqrMagnitude;
+				if (d > best) {
+					best = d;
+					b1 = i;
 				}
 			}
 
-			throw new System.ArgumentException("Can't generate hull, points are coplanar");
+			var p1 = points[b1];
+
+			if (b1 == b0 || AreCoincident(p0, p1)) {
+				throw new System.ArgumentException("Can't generate hull, points are coplanar");
+			}
+
+			b2 = b0;
+			best = 0.0f;
+			for (int i = 0; i < count; i++) {
+				var d = Cross(points[i] - p0, p1 - p0).sqrMagnitude;
+				if (d > best) {
+					best = d;
+					b2 = i;
+				}
+			}
+
+			var p2 = points[b2];
+
+			if (b2 == b0 || AreCollinear(p0, p1, p2)) {
+				throw new System.ArgumentException("Can't generate hull, points are coplanar");
+			}
+
+			var normal = Cross(p1 - p0, p2 - p0);
+
+			b3 = b0;
+			best = 0.0f;
+			for (int i = 0; i < count; i++) {
+				var d = Mathf.Abs(Dot(points[i] - p0, normal));
+				if (d > best) {
+					best = d;
+					b3 = i;
+				}
+			}
+
+			if (b3 == b0 || AreCoplanar(p0, p1, p2, points[b3])) {
+				throw new System.ArgumentException("Can't generate hull, points are coplanar");
+			}
 		}
 
 		/// <summary>
