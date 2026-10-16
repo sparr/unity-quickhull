@@ -925,10 +925,19 @@ namespace GK {
 
 		/// <summary>
 		///   Calculate normal for triangle
+		///
+		///   Vector3.normalized returns the zero vector for any vector shorter
+		///   than 1e-5, which here is any triangle with an area below 5e-6. A
+		///   face with a zero normal is at distance zero from every point, so
+		///   it is never lit, the horizon is found wrongly, and the hull stops
+		///   being convex. Points then keep being picked again and GrowHull
+		///   never terminates. So divide by the length directly.
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		Vector3 Normal(Vector3 v0, Vector3 v1, Vector3 v2) {
-			return Cross(v1 - v0, v2 - v0).normalized;
+			var normal = Cross(v1 - v0, v2 - v0);
+			var length = normal.magnitude;
+			return length > 0.0f ? normal / length : Vector3.zero;
 		}
 
 		/// <summary>
