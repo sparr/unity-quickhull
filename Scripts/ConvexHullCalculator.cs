@@ -371,15 +371,15 @@ namespace GK {
 
 			faceCount = 0;
 			if (above) {
-				faces[faceCount++] = new Face(b0, b2, b1, 3, 1, 2, Normal(points[b0], points[b2], points[b1]));
-				faces[faceCount++] = new Face(b0, b1, b3, 3, 2, 0, Normal(points[b0], points[b1], points[b3]));
-				faces[faceCount++] = new Face(b0, b3, b2, 3, 0, 1, Normal(points[b0], points[b3], points[b2]));
-				faces[faceCount++] = new Face(b1, b2, b3, 2, 1, 0, Normal(points[b1], points[b2], points[b3]));
+				faces[faceCount++] = new Face(b0, b2, b1, 3, 1, 2, FaceNormal(points[b0], points[b2], points[b1]));
+				faces[faceCount++] = new Face(b0, b1, b3, 3, 2, 0, FaceNormal(points[b0], points[b1], points[b3]));
+				faces[faceCount++] = new Face(b0, b3, b2, 3, 0, 1, FaceNormal(points[b0], points[b3], points[b2]));
+				faces[faceCount++] = new Face(b1, b2, b3, 2, 1, 0, FaceNormal(points[b1], points[b2], points[b3]));
 			} else {
-				faces[faceCount++] = new Face(b0, b1, b2, 3, 2, 1, Normal(points[b0], points[b1], points[b2]));
-				faces[faceCount++] = new Face(b0, b3, b1, 3, 0, 2, Normal(points[b0], points[b3], points[b1]));
-				faces[faceCount++] = new Face(b0, b2, b3, 3, 1, 0, Normal(points[b0], points[b2], points[b3]));
-				faces[faceCount++] = new Face(b1, b3, b2, 2, 0, 1, Normal(points[b1], points[b3], points[b2]));
+				faces[faceCount++] = new Face(b0, b1, b2, 3, 2, 1, FaceNormal(points[b0], points[b1], points[b2]));
+				faces[faceCount++] = new Face(b0, b3, b1, 3, 0, 2, FaceNormal(points[b0], points[b3], points[b1]));
+				faces[faceCount++] = new Face(b0, b2, b3, 3, 1, 0, FaceNormal(points[b0], points[b2], points[b3]));
+				faces[faceCount++] = new Face(b1, b3, b2, 2, 0, 1, FaceNormal(points[b1], points[b3], points[b2]));
 			}
 
 			VerifyFaces(points);
@@ -744,7 +744,7 @@ namespace GK {
 				faces[fi] = new Face(
 					v0, v1, v2,
 					o0, o1, o2,
-					Normal(points[v0], points[v1], points[v2]));
+					FaceNormal(points[v0], points[v1], points[v2]));
 
 				var horizonFace = faces[horizon[i].Face];
 
@@ -929,6 +929,23 @@ namespace GK {
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		Vector3 Normal(Vector3 v0, Vector3 v1, Vector3 v2) {
 			return Cross(v1 - v0, v2 - v0).normalized;
+		}
+
+		/// <summary>
+		///   Normal for a new face of the hull. A face whose normal comes out
+		///   zero is at distance zero from every point, so it is never lit and
+		///   corrupts the horizon search, and from then on the hull is not
+		///   convex and GrowHull may not terminate. Throw instead of building
+		///   it.
+		/// </summary>
+		Vector3 FaceNormal(Vector3 v0, Vector3 v1, Vector3 v2) {
+			var normal = Normal(v0, v1, v2);
+
+			if (!(normal.sqrMagnitude > 0.0f)) {
+				throw new System.InvalidOperationException("Can't generate hull, a face has zero area");
+			}
+
+			return normal;
 		}
 
 		/// <summary>
